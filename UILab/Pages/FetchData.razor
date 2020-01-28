@@ -5,6 +5,7 @@
 @using UILab.UIControls.DataGrid
 
 @inject WeatherForecastService ForecastService
+@inject IJSRuntime JSRuntime;
 
 <h1>Weather forecast</h1>
 
@@ -26,8 +27,7 @@ else
 
     <h3>Total Records: @data.Count</h3>
 
-    <table class="table table-bordered table-striped table-hover table-sm">
-        <caption>Weather Forcasts</caption>
+    <table class="table table-bordered table-striped table-hover table-sm" id="datatable">
         <thead>
             <tr>
                 <th @onclick='(() => Sort("Date", 0))'>
@@ -50,43 +50,73 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var forecast in data)
+            @for (int i = 0; i < data.Count; i++)
             {
-                <tr @onclick='(() => RowClickEvent(forecast.Summary))' class=@rowselectedCss>
-                    <td>@forecast.Date.ToShortDateString()</td>
-                    <td>@forecast.Summary</td>
-                    <td>@forecast.TemperatureC</td>
-                    <td>@forecast.TemperatureF</td>
+                int index = i + 1;
+                <tr @onclick='(() => RowClickEvent(index))'>
+                    <td>@data[i].Date.ToShortDateString()</td>
+                    <td>@data[i].Summary</td>
+                    <td>@data[i].TemperatureC</td>
+                    <td>@data[i].TemperatureF</td>
                 </tr>
             }
         </tbody>
     </table>
-    <br />
+    @if (data.Count > 25)
+    {
+        <nav aria-label="Page navigation example">
+            <ul class="pagination">
+                <li class="page-item">
+                    <a class="page-link" href="#" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                        <span class="sr-only">Previous</span>
+                    </a>
+                </li>
+                @for(int i = 1; i <= pageCount; i++)
+                { 
+                    <li class="page-item"><a class="page-link" href="#">@i</a></li>
+                }
+                <li class="page-item">
+                    <a class="page-link" href="#" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                        <span class="sr-only">Next</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    }
 }
 
 @code {
 
     private List<WeatherForecast> data;
+    private List<WeatherForecast> dataCollection;
     private bool sortDirection = false;
     private int sortIndex = 0;
-    private string spinnerbgImage = "imgs/spinner.gif";
+    private string spinnerbgImage = "img/spinner.gif";
     private bool spinning = true;
-    private string rowselectedCss = "";
+    private int pageSize = 25;
+    private int pageCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
         spinning = true;
         await Task.Delay(1);
-
-        data = await ForecastService.GetForecastAsync(DateTime.Now);
-
+        dataCollection = await ForecastService.GetForecastAsync(DateTime.Now);
+        pageCount = DataGridService.GetPageCount(pageSize, data.Count);
+        if(pageCount > 1)
+        {
+            data = (from a in dataCollection
+                    select a).Take(pageSize);
+        }
         spinning = false;
     }
 
-    public void Sort(string sortProperty, int index)
+    public async Task Sort(string sortProperty, int index)
     {
         string sortDir = "OrderBy";
-        if(!sortDirection)
+
+        if (!sortDirection)
         {
             sortDir = "OrderByDescending";
         }
@@ -94,10 +124,12 @@ else
         data = RecordSorterHelper.ApplyOrder<WeatherForecast>(data.AsQueryable(), sortProperty, sortDir).ToList();
         sortDirection = !sortDirection;
         sortIndex = index;
+
+        await JSRuntime.InvokeVoidAsync("hightlight_row", 0);
     }
 
-    private void RowClickEvent(string data)
+    private async Task RowClickEvent(int rowIndex)
     {
-        rowselectedCss = "selectedRow";
+        await JSRuntime.InvokeVoidAsync("hightlight_row", rowIndex);
     }
 }

@@ -1,0 +1,11 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/UILab
+/InternalLib/InternalLib/bin/Debug
+/InternalLib/InternalLib/obj/Debug
+/InternalLib/InternalLib/obj
+/UILab/bin/Debug/netcoreapp3.1/runtimes
+/UILab/bin/Debug/netcoreapp3.1
+/UILab/obj
