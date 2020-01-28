@@ -1,0 +1,103 @@
+﻿@page "/fetchdata"
+
+@using UILab.Data
+@using InternalLib
+@using UILab.UIControls.DataGrid
+
+@inject WeatherForecastService ForecastService
+
+<h1>Weather forecast</h1>
+
+<p>This component demonstrates fetching data from a service.</p>
+
+@if (data == null)
+{
+    @if (spinning)
+    {
+        <div class="spinner" style="background-image: url(@spinnerbgImage);"></div>
+    }
+}
+else
+{
+    @if (spinning)
+    {
+        <div class="spinner" style="background-image: url(@spinnerbgImage);"></div>
+    }
+
+    <h3>Total Records: @data.Count</h3>
+
+    <table class="table table-bordered table-striped table-hover table-sm">
+        <caption>Weather Forcasts</caption>
+        <thead>
+            <tr>
+                <th @onclick='(() => Sort("Date", 0))'>
+                    <span>Date</span>
+                    <span class="fa @(DataGridService.GetSortStyle(0, sortIndex, sortDirection))"></span>
+                </th>
+
+                <th @onclick='(() => Sort("Summary", 1))'>
+                    <span>Summary</span>
+                    <span class="fa @(DataGridService.GetSortStyle(1, sortIndex, sortDirection))"></span>
+                </th>
+                <th @onclick='(() => Sort("TemperatureC", 2))'>
+                    <span>Temperature C</span>
+                    <span class="fa @(DataGridService.GetSortStyle(2, sortIndex, sortDirection))"></span>
+                </th>
+                <th @onclick='(() => Sort("TemperatureF", 3))'>
+                    <span>Temperature F</span>
+                    <span class="fa @(DataGridService.GetSortStyle(3, sortIndex, sortDirection))"></span>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var forecast in data)
+            {
+                <tr @onclick='(() => RowClickEvent(forecast.Summary))' class=@rowselectedCss>
+                    <td>@forecast.Date.ToShortDateString()</td>
+                    <td>@forecast.Summary</td>
+                    <td>@forecast.TemperatureC</td>
+                    <td>@forecast.TemperatureF</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    <br />
+}
+
+@code {
+
+    private List<WeatherForecast> data;
+    private bool sortDirection = false;
+    private int sortIndex = 0;
+    private string spinnerbgImage = "imgs/spinner.gif";
+    private bool spinning = true;
+    private string rowselectedCss = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        spinning = true;
+        await Task.Delay(1);
+
+        data = await ForecastService.GetForecastAsync(DateTime.Now);
+
+        spinning = false;
+    }
+
+    public void Sort(string sortProperty, int index)
+    {
+        string sortDir = "OrderBy";
+        if(!sortDirection)
+        {
+            sortDir = "OrderByDescending";
+        }
+
+        data = RecordSorterHelper.ApplyOrder<WeatherForecast>(data.AsQueryable(), sortProperty, sortDir).ToList();
+        sortDirection = !sortDirection;
+        sortIndex = index;
+    }
+
+    private void RowClickEvent(string data)
+    {
+        rowselectedCss = "selectedRow";
+    }
+}
