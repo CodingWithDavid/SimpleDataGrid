@@ -3,9 +3,11 @@
 @using UILab.Data
 @using InternalLib
 @using UILab.UIControls.DataGrid
+@using UILab.UIControls.UIPagination
 
 @inject WeatherForecastService ForecastService
 @inject IJSRuntime JSRuntime;
+
 
 <h1>Weather forecast</h1>
 
@@ -25,90 +27,74 @@ else
         <div class="spinner" style="background-image: url(@spinnerbgImage);"></div>
     }
 
-    <h3>Total Records: @data.Count</h3>
+    <table class="table table-bordered table-striped table-hover table-sm" id="datatable" >
+            <thead style="background-color:darkgray">
+                <tr>
+                    <th @onclick='(() => Sort("Date", 0))'>
+                        <span>Date</span>
+                        <span class="fa @(gridService.GetSortStyle(0, sortIndex, sortDirection))"></span>
+                    </th>
 
-    <table class="table table-bordered table-striped table-hover table-sm" id="datatable">
-        <thead>
-            <tr>
-                <th @onclick='(() => Sort("Date", 0))'>
-                    <span>Date</span>
-                    <span class="fa @(DataGridService.GetSortStyle(0, sortIndex, sortDirection))"></span>
-                </th>
-
-                <th @onclick='(() => Sort("Summary", 1))'>
-                    <span>Summary</span>
-                    <span class="fa @(DataGridService.GetSortStyle(1, sortIndex, sortDirection))"></span>
-                </th>
-                <th @onclick='(() => Sort("TemperatureC", 2))'>
-                    <span>Temperature C</span>
-                    <span class="fa @(DataGridService.GetSortStyle(2, sortIndex, sortDirection))"></span>
-                </th>
-                <th @onclick='(() => Sort("TemperatureF", 3))'>
-                    <span>Temperature F</span>
-                    <span class="fa @(DataGridService.GetSortStyle(3, sortIndex, sortDirection))"></span>
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            @for (int i = 0; i < data.Count; i++)
-            {
-                int index = i + 1;
-                <tr @onclick='(() => RowClickEvent(index))'>
-                    <td>@data[i].Date.ToShortDateString()</td>
-                    <td>@data[i].Summary</td>
-                    <td>@data[i].TemperatureC</td>
-                    <td>@data[i].TemperatureF</td>
+                    <th @onclick='(() => Sort("Summary", 1))'>
+                        <span>Summary</span>
+                        <span class="fa @(gridService.GetSortStyle(1, sortIndex, sortDirection))"></span>
+                    </th>
+                    <th @onclick='(() => Sort("TemperatureC", 2))'>
+                        <span>Temperature C</span>
+                        <span class="fa @(gridService.GetSortStyle(2, sortIndex, sortDirection))"></span>
+                    </th>
+                    <th @onclick='(() => Sort("TemperatureF", 3))'>
+                        <span>Temperature F</span>
+                        <span class="fa @(gridService.GetSortStyle(3, sortIndex, sortDirection)) "></span>
+                    </th>
                 </tr>
-            }
-        </tbody>
-    </table>
-    @if (data.Count > 25)
-    {
-        <nav aria-label="Page navigation example">
-            <ul class="pagination">
-                <li class="page-item">
-                    <a class="page-link" href="#" aria-label="Previous">
-                        <span aria-hidden="true">&laquo;</span>
-                        <span class="sr-only">Previous</span>
-                    </a>
-                </li>
-                @for(int i = 1; i <= pageCount; i++)
-                { 
-                    <li class="page-item"><a class="page-link" href="#">@i</a></li>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < data.Count; i++)
+                {
+                    int index = i + 1;
+                    <tr @onclick='(() => RowClickEvent(index))'>
+                        <td>@data[i].Date.ToShortDateString()</td>
+                        <td>@data[i].Summary</td>
+                        <td>@data[i].TemperatureC</td>
+                        <td>@data[i].TemperatureF</td>
+                    </tr>
                 }
-                <li class="page-item">
-                    <a class="page-link" href="#" aria-label="Next">
-                        <span aria-hidden="true">&raquo;</span>
-                        <span class="sr-only">Next</span>
-                    </a>
-                </li>
-            </ul>
-        </nav>
-    }
+            </tbody>
+        </table>
+
+        <Pagination CurrentPage=@gridService.CurrentPage PageCount=@gridService.PageCount VisiblePages="5" OnPageChanged="GetPage"/>
+
+    <h4>Total Records: @dataCollection.Count</h4>
 }
 
 @code {
 
     private List<WeatherForecast> data;
     private List<WeatherForecast> dataCollection;
+    private DataGridService<WeatherForecast> gridService = new DataGridService<WeatherForecast>();
     private bool sortDirection = false;
     private int sortIndex = 0;
     private string spinnerbgImage = "img/spinner.gif";
     private bool spinning = true;
-    private int pageSize = 25;
-    private int pageCount = 0;
+
+    delegate Task GetNextPage(int page);
 
     protected override async Task OnInitializedAsync()
     {
         spinning = true;
         await Task.Delay(1);
+
         dataCollection = await ForecastService.GetForecastAsync(DateTime.Now);
-        pageCount = DataGridService.GetPageCount(pageSize, data.Count);
-        if(pageCount > 1)
-        {
-            data = (from a in dataCollection
-                    select a).Take(pageSize);
-        }
+        //setup grid service
+        gridService.PageSize = 15;
+        gridService.CurrentPage = 1;
+        gridService.PageCount = gridService.GetPageCount(gridService.PageSize, dataCollection.Count);
+        data = gridService.GetPage(dataCollection.AsQueryable(), 1);
+
+        //set get next page function
+        GetNextPage GetNewPage = GetPage;
+
         spinning = false;
     }
 
@@ -121,7 +107,7 @@ else
             sortDir = "OrderByDescending";
         }
 
-        data = RecordSorterHelper.ApplyOrder<WeatherForecast>(data.AsQueryable(), sortProperty, sortDir).ToList();
+        data = gridService.Sort(data.AsQueryable(), sortProperty, sortDir).ToList();
         sortDirection = !sortDirection;
         sortIndex = index;
 
@@ -131,5 +117,14 @@ else
     private async Task RowClickEvent(int rowIndex)
     {
         await JSRuntime.InvokeVoidAsync("hightlight_row", rowIndex);
+    }
+
+    public Task GetPage(int page)
+    {
+        data = gridService.GetPage(dataCollection.AsQueryable(), page).ToList();
+        gridService.CurrentPage = page;
+        JSRuntime.InvokeVoidAsync("hightlight_row", 0);
+        this.StateHasChanged();
+        return null;
     }
 }
